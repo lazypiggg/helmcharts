@@ -1,0 +1,14 @@
+apiVersion: v1
+description: A Helm chart for spark which is a fast and general-purpose cluster computing system.
+name: spark
+version: 2.2.0-0.1.0
+appVersion: 2.2.0
+home: http://spark.apache.org/
+sources:
+- https://github.com/apache/spark
+icon: http://spark.apache.org/images/spark-logo.png
+charttype: 4
+maintainers:
+- name: yuanfang
+  email: yuanfang@alauda.io
+  description: fork from offical repo stable/spark, add some custom configuration.

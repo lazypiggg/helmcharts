@@ -1,0 +1,59 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ template "worker-fullname" . }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    component: "{{ .Release.Name }}-{{ .Values.Worker.Component }}"
+spec:
+  replicas: {{ default 1 .Values.Worker.Replicas }}
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      component: "{{ .Release.Name }}-{{ .Values.Worker.Component }}"
+  template:
+    metadata:
+      labels:
+        heritage: {{ .Release.Service | quote }}
+        release: {{ .Release.Name | quote }}
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        component: "{{ .Release.Name }}-{{ .Values.Worker.Component }}"
+    spec:
+      containers:
+        - name: {{ template "worker-fullname" . }}
+          image:  {{ .Values.registryAddress }}{{- template "spark.image.repository.part" . -}}:{{- template "spark.image.tag" . }}
+          command:
+          - sh
+          - -c
+          - "echo spark.master spark://{{- template "master-fullname" . -}}:{{- .Values.Master.ServicePort }} >> /opt/alauda/spark/conf/spark-defaults.conf && spark-class org.apache.spark.deploy.worker.Worker spark://{{- template "master-fullname" . -}}:{{- .Values.Master.ServicePort -}}"
+          ports:
+            - containerPort: {{ .Values.Worker.ContainerPort }}
+          resources:
+            requests:
+              cpu: "{{ .Values.Worker.Cpu }}"
+              memory: "{{ .Values.Worker.Memory }}"
+          env:
+          - name: SPARK_DAEMON_MEMORY
+            value: {{ default "1g" .Values.Worker.DaemonMemory | quote }}
+          - name: SPARK_WORKER_MEMORY
+            value: {{ default "1g" .Values.Worker.ExecutorMemory | quote }}
+          - name: SPARK_WORKER_WEBUI_PORT
+            value: {{ .Values.WebUi.ContainerPort | quote }}
+          {{- if .Values.hadoop.ready }}
+          - name: HADOOP_CONF_DIR
+            value: "/etc/hadoop"
+          - name: YARN_CONF_DIR
+            value: "/etc/hadoop"
+          volumeMounts:
+          - name: hadoop-config
+            mountPath: /etc/hadoop
+          {{- end }}
+      {{- if .Values.hadoop.ready }}
+      volumes:
+      - name: hadoop-config
+        configMap: 
+          name: {{ index .Values "hadoop" "configMapName"}}
+      {{- end }}

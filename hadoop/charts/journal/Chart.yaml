@@ -1,0 +1,12 @@
+apiVersion: v1
+description: A Helm chart for journal-node using by hadoop high available mode.
+name: journal
+version: 2.7.4-0.1.0
+appVersion: 2.7.4
+home: https://hadoop.apache.org/
+sources:
+- https://github.com/apache/hadoop
+icon: http://hadoop.apache.org/images/hadoop-logo.jpg
+maintainers:
+- name: yuanfang
+  email: yuanfang@alauda.io

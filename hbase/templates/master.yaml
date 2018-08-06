@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-cm" }} 
+data:
+  SERVICES: hbase
+  GROUP: master
+  GROUP_ROLE: master
+  COMPONENT: hm
+
+#---    
+#apiVersion: policy/v1beta1
+#kind: PodDisruptionBudget
+#metadata:
+#  name: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-pdb" }}
+#spec:
+#  selector:
+#    matchLabels:
+#      vender: {{ .Values.metadata.vendor }}
+#      app: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }}
+#      chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+#      release: {{ .Release.Name }} 
+#  maxUnavailable: {{ .Values.masterPod.pdbMinAvailable }}
+---  
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-cs" }}
+  labels:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "hbase.name" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  ports:
+  {{- range $key, $val := .Values.masterPod.clientPort }}
+  - name: {{ $key }}
+    port: {{ $val }}
+  {{- end }}
+  selector:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+---    
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-svc" }}
+  labels:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "hbase.name" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  ports:
+  {{- range $key, $val := .Values.masterPod.port }}
+  - name: {{ $key }}
+    port: {{ $val }}
+  {{- end }}
+  clusterIP: None
+  selector:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+---    
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }}
+spec:
+  serviceName: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-svc" }}
+  # *** don't change master's replicas , 2 standfor 2 ha node, which contains namenode and resourcemanager.
+  replicas: 2
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        vender: {{ .Values.metadata.vendor }}
+        app: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+        chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+        release: {{ .Release.Name }} 
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                    - {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+              topologyKey: "kubernetes.io/hostname"
+
+      containers:
+      - name: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+        imagePullPolicy: Always
+        image: {{ .Values.registryAddress }}{{- template "image.repository.part" . -}}:{{- template "image.tag" . }}
+        resources:
+          requests:
+            memory: {{ .Values.masterPod.resources.requests.memory}} 
+            cpu: {{ .Values.masterPod.resources.requests.cpu}}
+          limits:
+            memory: {{ .Values.masterPod.resources.limits.memory}} 
+            cpu: {{ .Values.masterPod.resources.limits.cpu}}
+        ports:
+        {{- range $key, $val := .Values.masterPod.port }}
+        - containerPort: {{ $val }}
+        {{- end }}
+
+        command:
+        - sh
+        - -c
+        - {{ if .Values.hadoop.ready -}}
+           "cp /tmp/hadoop-config/bootstrap.sh /usr/local/bin/bootstrap.sh && chmod 755 /usr/local/bin/bootstrap.sh && /usr/local/bin/bootstrap.sh && \
+          {{- else -}}
+           "\
+          {{- end }}
+          {{ if .Values.injectCfgFiles.enabled -}}
+            cp /tmp/hadoop-config/bootstrap.sh /usr/local/bin/bootstrap.sh && chmod 755 /usr/local/bin/bootstrap.sh && /usr/local/bin/bootstrap.sh && /opt/alauda/sbin/startup.sh"
+          {{- else -}}
+            /opt/alauda/sbin/startup.sh"
+          {{- end }}
+        envFrom:
+        - configMapRef:
+            name: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-cm"}}
+        volumeMounts:
+        - name: datadir
+          mountPath: {{ .Values.masterPod.mountPath}}
+        {{- if .Values.injectCfgFiles.enabled }}
+        - mountPath: /tmp/hbase-config/bootstrap.sh
+          name: config-files
+          subPath: bootstrap.sh
+        - mountPath: {{ .Values.injectCfgFiles.cfgMountPath }}/conf/hbase-site.xml
+          name: config-files
+          subPath: hbase-site.xml
+        {{- end }}
+        {{- if .Values.hadoop.ready }}
+        - name: hadoop-config
+          mountPath: /tmp/hadoop-config
+        {{- end }}
+
+      volumes:
+      {{- if eq .Values.masterPod.persistence.enabled false }}
+      - name: datadir
+        emptyDir: {}
+      {{- end }}
+      {{- if .Values.injectCfgFiles.enabled }}
+      - name: config-files
+        configMap: 
+          {{- if or (eq "" .Values.injectCfgFiles.configMapName ) (eq "-" .Values.injectCfgFiles.configMapName ) }}
+          name: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "config-files" }} 
+          {{- else }}
+          name: {{ .Values.injectCfgFiles.configMapName }}
+          {{- end }}
+      {{- end }}
+      {{- if .Values.hadoop.ready }}
+      - name: hadoop-config
+        configMap: 
+          name: {{ index .Values "hadoop" "configMapName"}}
+      {{- end }}
+
+{{- if .Values.masterPod.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ {{ .Values.masterPod.persistence.accessMode }} ]
+      resources:
+        requests:
+          storage: {{ .Values.masterPod.persistence.size }}
+      {{- if .Values.masterPod.persistence.storageClass }}
+      {{- if (eq "-" .Values.masterPod.persistence.storageClass) }}
+      storageClassName: ""
+      {{- else }}
+      storageClassName: {{ .Values.masterPod.persistence.storageClass | quote }}
+      {{- end }}
+      {{- end }}
+{{- end -}}
+

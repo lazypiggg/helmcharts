@@ -1,0 +1,127 @@
+{{- $imagePullPolicy := .Values.imagePullPolicy -}}
+{{- $chartname := .Chart.Name -}}
+{{- $chartversion := .Chart.Version -}}
+{{- $relname := .Release.Name -}}
+{{- $relservice := .Release.Service -}}
+{{- $namespace := .Release.Namespace -}}
+{{- $mem_req := .Values.resources.requests.memory -}}
+{{- $cpu_req := .Values.resources.requests.cpu -}}
+{{- $mem_limit := .Values.resources.limits.memory -}}
+{{- $cpu_limit := .Values.resources.limits.cpu -}}
+{{- $image_tag := .Values.image_tag -}}
+{{- $port := .Values.port -}}
+{{- $replicaNum := .Values.replicaNum -}}
+{{- $registryAddress := .Values.registryAddress -}}
+{{- $hostnodes := .Values.nodeName -}}
+{{- $passwd := .Values.passwd -}}
+{{- $HostUsedPath := .Values.persistence.host.HostUsedPath -}}
+{{- $pvmode := .Values.persistence.mode -}}
+{{- $iptag := .Values.iptag -}}
+{{- $cluster_node_timeout := div .Values.cluster_node_timeout 1000 -}}
+{{- $real_time_out := mul .Values.cluster_slave_validity_factor $cluster_node_timeout -}}
+{{- $redis_timeout_and_period := add .Values.repl_ping_slave_period $real_time_out -}}
+
+
+
+{{- range $index, $realnodeName := .Values.nodeName }}
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ $relname }}-{{ $chartname }}-{{ $index }}
+  labels:
+    app: {{ $relname }}-{{ $chartname }}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: {{ $relname }}-{{ $chartname }}-{{ $index }}
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: {{ $iptag }}
+                  operator: In
+                  values:
+                  - {{ $realnodeName }}
+      hostNetwork: true
+      containers:
+      - name: {{ $relname }}-{{ $chartname }}-{{ $index }}
+        image: "{{ $registryAddress }}/claas/catalog-v2-redis-cluster:1.0.0"
+        imagePullPolicy: "{{ $imagePullPolicy }}"
+        ports:
+        - containerPort: {{ $port }}
+          name: client
+        - containerPort: {{ add $port 10000 }}
+          name: gossip
+        command: ["/init_redis_cluster.sh"]
+        args: ["cluster"]
+        env:
+        {{- if $passwd }}
+        - name: REDIS_PASSWD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $relname }}-{{ $chartname }}
+              key: redis-password
+        {{- end }}
+        - name: REPLICAS_NUM
+          value: "{{ $replicaNum }}"
+        - name: REDIS_TRIB_PARA
+          value: >-
+          {{- range $id, $nname := $hostnodes }}
+            {{ $nname }}:{{ $port }}
+          {{- end }}
+        {{- if eq $index 0 }}
+        - name: MASTER
+          value: "1"
+        {{- end }}
+        resources:
+          limits:
+            cpu: {{ $cpu_limit }}
+            memory: {{ $mem_limit }}
+          requests:
+            cpu: {{ $cpu_req }}
+            memory: {{ $mem_req }}
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "redis-cli -h {{ $realnodeName }} -p {{ $port }} ping"
+          initialDelaySeconds: 15
+          timeoutSeconds: 5
+          periodSeconds: {{ add $redis_timeout_and_period 10 }}
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "redis-cli -h {{ $realnodeName }} -p {{ $port }} ping"
+          initialDelaySeconds: 20
+          periodSeconds: {{ add $redis_timeout_and_period 10 }}
+        volumeMounts:
+        - name: conf
+          mountPath: /conf
+          readOnly: false
+        - name: data
+          mountPath: /data
+          readOnly: false
+      volumes:
+      - name: conf
+        configMap:
+          name: {{ $relname }}-{{ $chartname }}
+          items:
+          - key: redis.conf
+            path: redis.conf
+      - name: data
+      {{- if eq $pvmode "pvc" }}
+        persistentVolumeClaim:
+          claimName: {{ $relname }}-{{ $chartname }}-{{ $index }}
+      {{- else }}
+        hostPath:
+          path: {{ $HostUsedPath }}/{{ $namespace }}/{{ $relname }}-{{ $chartname }}-{{ $index }}/
+      {{- end -}}
+{{- end }}

@@ -1,0 +1,19 @@
+1. Get the HDFS WEB URL by executing below commands in same shell:
+  
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+  You can watch the status of by running 'kubectl get svc --namespace {{ .Release.Namespace }} -w {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-cs" }}'
+  
+  export MASTER_IP=$(kubectl get svc --namespace {{ .Release.Namespace }}  {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-cs" }} -o jsonpath='{.spec.clusterIP}')
+  echo http://$MASTER_IP: {{- .Values.masterPod.clientPort.p50070 }}
+
+
+2. Get the YARN WEB URL by executing below commands in same shell:
+  
+  echo http://$MASTER_IP: {{- .Values.masterPod.clientPort.p8088 -}}/cluster
+
+
+3. Scale out the Compute and Data Nodes which are called Core Node in Core Group, using below commands:
+
+  kubectl scale statefulsets --namespace {{ .Release.Namespace }} {{ template "hadoop.fullname" . }}-{{ .Values.metadata.k8sResourceName.core}} --replicas={N}
+
+  

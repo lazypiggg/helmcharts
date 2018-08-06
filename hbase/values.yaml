@@ -1,0 +1,142 @@
+########################################################
+##
+##  ** Main chart values definition. **
+##  desc: define chart values which used by templates
+##  author: yuanfang@alauda.io
+##
+########################################################
+
+
+# 
+# alauda internal metadata ,describe the structure for alauda bigdata's charts.
+#
+metadata: 
+  vendor: alauda
+  k8sResourceName:
+    ########################################
+    # current chart resources
+    ########################################
+    # for app
+    config-files: config-files
+    config-params: config-params
+
+    # for specific component
+    master: master
+    master-svc: master-svc
+    master-pdb: master-pdb
+    master-cm: master-cm
+    master-cm-env: master-cm-env
+    master-pvc: master-pvc
+    master-cs: master-client-svc
+    
+    core: core
+    core-svc: core-svc
+    core-pdb: core-pdb
+    core-cm: core-cm
+    core-cm-env: core-cm-env
+    core-pvc: core-pvc
+
+
+registryAddress: index.alauda.cn
+imagePullPolicy: IfNotPresent
+
+# Select anitAffinity as either hard or soft, default is hard
+antiAffinity: "soft"
+
+#
+# hadoop-ha mode has 3 masters(master-pod) & N slaves (core-pod)
+# 
+hbase:
+  root-dir: "/hbase"
+
+masterPod:
+  pdbMinAvailable: 1
+  resources:
+    requests:
+      memory: "1024Mi"
+      cpu: "500m"
+    limits:
+      memory: "4096Mi"
+      cpu: "2000m"
+  port:
+    p16000: 16000
+  clientPort:
+    p16010: 16010
+
+  mountPath: /data01/data
+  persistence:
+    enabled: false
+    storageClass: ""
+    accessMode: ReadWriteOnce 
+    size: 2Gi
+
+corePod:
+  replicas: 1
+  parallelCreate: true
+  pdbMinAvailable: 1
+  resources:
+    requests:
+      memory: "1024Mi"
+      cpu: "500m"
+    limits:
+      memory: "4096Mi"
+      cpu: "2000m"
+  port: 
+    p16020: 16020
+    p16030: 16030
+  mountPath: /data01/data
+  persistence:
+    enabled: false
+    storageClass: ""
+    accessMode: ReadWriteOnce 
+    size: 5Gi
+
+injectCfgFiles:
+  enabled: true
+  cfgMountPath: /opt/alauda/hbase
+  configMapName: ""
+
+
+########################################################
+##
+##  ** related section define the other related thing,
+##     such as dependent and subChart variables which 
+##     will override the props later.
+##  desc: there can be more than one related settings
+##  author: yuanfang@alauda.io
+##
+########################################################
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## structure
+## relatedChartName - 
+## metadata - 
+## k8sResourceName -
+## resourceName1 - 
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# relatedChartName:
+  # metadata: 
+    # k8sResourceName:
+      # resourceName1:
+      # resourceName2:
+  # values1:
+    # sub values:
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# dependency zk for hbase
+zookeeper:
+  ready: true
+  metadata: 
+    k8sResourceName:
+      namespace: default
+      svc: zk-hs
+      name: zk
+  port:
+    clientPort: 2181
+  replicas: 3
+
+# dependency hadoop for hbase
+hadoop:
+  ready: true
+  masterPod:
+    nameservice: t1-hadoop
+  configMapName: t1-hadoop-config-files

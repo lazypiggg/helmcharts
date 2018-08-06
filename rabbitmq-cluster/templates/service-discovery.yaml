@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "rabbitmq-ha.fullname" . }}-discovery
+  labels:
+    app: {{ template "rabbitmq-ha.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  clusterIP: None
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.rabbitmqManagerPort }}
+      targetPort: http
+    - name: amqp
+      protocol: TCP
+      port: {{ .Values.rabbitmqNodePort }}
+      targetPort: amqp
+    - name: epmd
+      protocol: TCP
+      port: {{ .Values.rabbitmqEpmdPort }}
+      targetPort: epmd
+    {{- if .Values.rabbitmqAmqpsSupport.enabled }}
+    - name: amqps
+      protocol: TCP
+      port: {{ .Values.rabbitmqAmqpsSupport.amqpsNodePort }}
+      targetPort: amqps
+    {{- end }}
+  selector:
+    app: {{ template "rabbitmq-ha.name" . }}
+    release: {{ .Release.Name }}
+  type: ClusterIP

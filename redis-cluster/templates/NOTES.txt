@@ -1,0 +1,20 @@
+Redis can be accessed via port 6379 on the following DNS name from within your cluster:
+{{ .Values.nodeName }}
+
+{{- if .Values.passwd }}
+To get your password run:
+
+    REDIS_PASSWORD=$(kubectl get secret --namespace {{ .Release.Namespace }} {{ template "redis.fullname" . }} -o jsonpath="{.data.redis-password}" | base64 --decode)
+{{- end }}
+
+To manage your redis cluster:
+
+1. exec in redis pod:
+   get pod name
+   kubectl exec -it {{ template "redis.fullname" . }} bash
+   cd /usr/local/bin
+   {{- if .Values.passwd }}
+   ./redis-cli -c -a {{ .Values.passwd }}
+   {{- else }}
+   ./redis-cli -c
+   {{- end }}

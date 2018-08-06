@@ -1,0 +1,12 @@
+apiVersion: v1
+description: Turbine is a tool for aggregating streams of Server-Sent Event (SSE) JSON data into a single stream. The targeted use case is metrics streams from instances in an SOA being aggregated for dashboards.
+name: turbine
+version: 0.1.0
+appVersion: 0.1.0
+charttype: 1
+sources:
+- https://github.com/Netflix/Turbine
+icon: https://s3.cn-north-1.amazonaws.com.cn/homepage/catalog/Turbine.png
+maintainers:
+- name: skwang
+  email: skwang@alauda.io

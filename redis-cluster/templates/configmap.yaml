@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "redis.fullname" . }}
+  labels:
+    app: {{ template "redis.fullname" . }}
+data:
+  redis.conf: |+
+    cluster-enabled yes
+    cluster-require-full-coverage {{ .Values.cluster_require_full_coverage }}
+    cluster-node-timeout {{ .Values.cluster_node_timeout }}
+    cluster-config-file /data/nodes.conf
+    cluster-migration-barrier 1
+    appendonly no
+    save ""
+    protected-mode {{ .Values.protected_mode }}
+    port {{ .Values.port }}
+    logfile "/data/redis.log"
+    {{- if .Values.passwd }}
+    requirepass {{ .Values.passwd }}
+    masterauth {{ .Values.passwd }}
+    {{- end }}
+    bind {{ .Values.bind }}
+    timeout {{ .Values.timeout }}
+    tcp-keepalive {{ .Values.tcp_keepalive }}
+    loglevel {{ .Values.loglevel }}
+    slave-serve-stale-data {{ .Values.slave_serve_stale_data }}
+    maxclients {{ .Values.maxclients }}
+    maxmemory {{ .Values.maxmemory }}
+    maxmemory-policy {{ .Values.maxmemory_policy }}
+    repl-ping-slave-period {{ .Values.repl_ping_slave_period }}
+    repl-timeout {{ .Values.repl_timeout }}
+    cluster-slave-validity-factor {{ .Values.cluster_slave_validity_factor }}
+    lazyfree-lazy-eviction {{ .Values.lazyfree_lazy_eviction }}
+    lazyfree-lazy-expire {{ .Values.lazyfree_lazy_expire }}
+    lazyfree-lazy-server-del {{ .Values.lazyfree_lazy_server_del }}
+    slave-lazy-flush {{ .Values.slave_lazy_flush }}
+    slowlog-log-slower-than {{ .Values.slowlog_log_slower_than }}
+    slowlog-max-len {{ .Values.slowlog_max_len }}
+    client-output-buffer-limit normal {{ .Values.client_output_buffer_limit_normal }}
+    client-output-buffer-limit slave {{ .Values.client_output_buffer_limit_slave }}
+    client-output-buffer-limit pubsub {{ .Values.client_output_buffer_limit_pubsub }}
+    client-query-buffer-limit {{ .Values.client_query_buffer_limit }}

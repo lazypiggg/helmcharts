@@ -1,0 +1,42 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ template "fullname" . }}-{{ .Release.Namespace }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+  name: {{ template "fullname" . }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "fullname" . }}-{{ .Release.Namespace }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "fullname" . }}-{{ .Release.Namespace }}
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        release: "{{ .Release.Name }}"
+        releaseRevision: "{{ .Release.Revision }}"
+        heritage: "{{ .Release.Service }}"
+    spec:
+      containers:
+      - env:
+        - name: ALAUDA_SERVER_PORT
+          value: "{{ .Values.port }}"
+        - name: ALAUDA_SPRING_APPLICATION_NAME
+          value: {{ template "fullname" . }}
+        - name: ALAUDA_HEADLESSSERVICE
+          value: {{ template "fullname". }}-headless.{{ .Release.Namespace }}.svc.cluster.local
+        - name: ALAUDA_JAVA_OPTS
+          value: {{ .Values.javaOptions }}
+        image: "{{ .Values.registryAddress }}/claas/eureka:v0.0.2"
+        name: eureka
+        resources:
+          limits:
+            cpu: {{ .Values.resources.limits.cpu }}
+            memory: {{ .Values.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.resources.requests.cpu }}
+            memory: {{ .Values.resources.requests.memory }}

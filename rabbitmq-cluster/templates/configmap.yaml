@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "rabbitmq-ha.fullname" . }}
+  labels:
+    app: {{ template "rabbitmq-ha.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+  enabled_plugins: |
+    [
+
+      rabbitmq_consistent_hash_exchange,
+      rabbitmq_federation,
+      rabbitmq_federation_management,
+      rabbitmq_management,
+      rabbitmq_peer_discovery_k8s,
+      rabbitmq_shovel,
+      rabbitmq_shovel_management
+    ].
+
+  rabbitmq.conf: |
+    ## RabbitMQ configuration
+    ## Ref: https://github.com/rabbitmq/rabbitmq-server/blob/master/docs/rabbitmq.conf.example
+
+
+    ## Clustering
+    cluster_formation.peer_discovery_backend  = rabbit_peer_discovery_k8s
+    cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+    cluster_formation.k8s.address_type = hostname
+    cluster_formation.node_cleanup.interval = 10
+    # Set to false if automatic cleanup of absent nodes is desired.
+    # This can be dangerous, see http://www.rabbitmq.com/cluster-formation.html#node-health-checks-and-cleanup.
+    cluster_formation.node_cleanup.only_log_warning = true
+    cluster_partition_handling = autoheal
+    cluster_formation.node_type = disc
+
+    ## The default "guest" user is only permitted to access the server
+    ## via a loopback interface (e.g. localhost)
+    loopback_users.guest = false
+
+    num_acceptors.tcp = {{ .Values.num_tcp_acceptors }}
+    handshake_timeout = {{ .Values.handshake_timeout }}
+    vm_memory_high_watermark_paging_ratio = {{ .Values.vm_memory_high_watermark_paging_ratio }}
+    disk_free_limit.absolute = {{ .Values.disk_free_limit }}
+    frame_max = {{ .Values.frame_max }}
+    channel_max = {{ .Values.channel_max }}
+    heartbeat = {{ .Values.heartbeat }}
+    collect_statistics = {{ .Values.collect_statistics }}
+    collect_statistics_interval = {{ .Values.collect_statistics_interval }}
+    cluster_keepalive_interval = {{ .Values.cluster_keepalive_interval }}
+    queue_index_embed_msgs_below = {{ .Values.queue_index_embed_msgs_below }}
+    mnesia_table_loading_retry_timeout = {{ .Values.mnesia_table_loading_retry_timeout }}
+
+
+
+    ## AMQPS support
+    {{- if .Values.rabbitmqAmqpsSupport.enabled }}
+{{ .Values.rabbitmqAmqpsSupport.config | indent 4 }}
+    {{- end }}

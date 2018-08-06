@@ -1,0 +1,13 @@
+1. Get the HBase URL by executing below commands in same shell:
+  
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+  You can watch the status of by running 'kubectl get svc --namespace {{ .Release.Namespace }} -w {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-cs" }}'
+  
+  export HBASE_WEB_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-cs" }} -o jsonpath='{.spec.clusterIP}' )
+  echo http://$HBASE_WEB_IP: {{- .Values.masterPod.clientPort.p16010 }}
+
+
+
+2. Scale out the Compute and Data Nodes which are called Core Node in Core Group, using below commands:
+
+  kubectl scale statefulsets --namespace {{ .Release.Namespace }} {{ template "hbase.fullname" . }}-{{ .Values.metadata.k8sResourceName.core}} --replicas={N}

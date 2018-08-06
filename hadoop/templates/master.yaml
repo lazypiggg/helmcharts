@@ -1,0 +1,191 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-cm" }} 
+data:
+  SERVICES: hadoop-ha
+  GROUP: master
+  COMPONENT: nn,rm
+  NAMENODE_ADDR1:  "{{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }}-0.{{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-svc" }}.{{ .Release.Namespace}}"
+  NAMENODE_ADDR2:  "{{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }}-1.{{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-svc" }}.{{ .Release.Namespace}}"
+  NAMENODE_PORT: {{ .Values.masterPod.port.p9000 | quote }}
+  DATA_PATH: {{ .Values.masterPod.mountPath}}
+  QJOURNAL_LIST: {{ range $v := until ((int .Values.journal.journalPod.replicas) | default 3 )}}
+                {{- $.Release.Name -}}-{{- index $.Values "journal" "metadata" "k8sResourceName" "journal-chart" -}}-{{- $v -}}
+                .{{- $.Release.Name -}}-{{- index $.Values "journal" "metadata" "k8sResourceName" "journal-chart" -}}
+                -{{- index $.Values "journal" "metadata" "k8sResourceName" "journal-svc" -}}
+                .{{- index $.Values "journal" "metadata" "k8sResourceName" "journal-namespace" | default  $.Release.Namespace -}}
+                :{{- index $.Values.journal.journalPod.port.p8485 -}}
+                {{- if eq (add1 $v) (int $.Values.journal.journalPod.replicas) -}}
+                {{- else -}}
+                {{- printf ";" -}}
+                {{- end -}}
+                {{- end }}
+#---    
+#apiVersion: policy/v1beta1
+#kind: PodDisruptionBudget
+#metadata:
+#  name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-pdb" }}
+#spec:
+#  selector:
+#    matchLabels:
+#      vender: {{ .Values.metadata.vendor }}
+#      app: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }}
+#      chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+#      release: {{ .Release.Name }} 
+#  maxUnavailable: {{ .Values.masterPod.pdbMinAvailable }}
+---  
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-cs" }}
+  labels:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "hadoop.name" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  ports:
+  {{- range $key, $val := .Values.masterPod.clientPort }}
+  - name: {{ $key }}
+    port: {{ $val }}
+  {{- end }}
+  selector:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+---    
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-svc" }}
+  labels:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "hadoop.name" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  ports:
+  {{- range $key, $val := .Values.masterPod.port }}
+  - name: {{ $key }}
+    port: {{ $val }}
+  {{- end }}
+  clusterIP: None
+  selector:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+---    
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }}
+spec:
+  serviceName: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-svc" }}
+  # *** don't change master's replicas , 2 standfor 2 ha node, which contains namenode and resourcemanager.
+  replicas: 2
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        vender: {{ .Values.metadata.vendor }}
+        app: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+        chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+        release: {{ .Release.Name }} 
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                    - {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+              topologyKey: "kubernetes.io/hostname"
+
+      containers:
+      - name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master" }} 
+        imagePullPolicy: Always
+        image: {{ .Values.registryAddress }}{{- template "image.repository.part" . -}}:{{- template "image.tag" . }}
+        resources:
+          requests:
+            memory: {{ .Values.masterPod.resources.requests.memory}} 
+            cpu: {{ .Values.masterPod.resources.requests.cpu}}
+          limits:
+            memory: {{ .Values.masterPod.resources.limits.memory}} 
+            cpu: {{ .Values.masterPod.resources.limits.cpu}}
+        ports:
+        {{- range $key, $val := .Values.masterPod.port }}
+        - containerPort: {{ $val }}
+        {{- end }}
+       
+        command:
+        - sh
+        - -c
+        {{ if .Values.injectCfgFiles.enabled -}}
+        - "cp /tmp/hadoop-config/bootstrap.sh /usr/local/bin/bootstrap.sh && chmod 755 /usr/local/bin/bootstrap.sh && /usr/local/bin/bootstrap.sh && /opt/alauda/sbin/startup.sh"
+        {{- else -}}
+        - "/opt/alauda/sbin/startup.sh"
+        {{- end }}
+        envFrom:
+        - configMapRef:
+            name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-cm"}}
+        volumeMounts:
+        - name: datadir
+          mountPath: {{ .Values.masterPod.mountPath}}
+        {{- if .Values.injectCfgFiles.enabled }}
+        - mountPath: /tmp/hadoop-config/bootstrap.sh
+          name: config-files
+          subPath: bootstrap.sh
+        - mountPath: {{ .Values.injectCfgFiles.cfgMountPath }}/etc/hadoop/core-site.xml 
+          name: config-files
+          subPath: core-site.xml
+        - mountPath: {{ .Values.injectCfgFiles.cfgMountPath }}/etc/hadoop/hdfs-site.xml
+          name: config-files
+          subPath: hdfs-site.xml
+        - mountPath: {{ .Values.injectCfgFiles.cfgMountPath }}/etc/hadoop/mapred-site.xml
+          name: config-files
+          subPath: mapred-site.xml
+        - mountPath: {{ .Values.injectCfgFiles.cfgMountPath }}/etc/hadoop/yarn-site.xml
+          name: config-files
+          subPath: yarn-site.xml  
+        {{- end }}
+      volumes:
+      {{- if not .Values.masterPod.persistence.enabled }}
+      - name: datadir
+        emptyDir: {}
+      {{- end }}
+      {{- if .Values.injectCfgFiles.enabled }}
+      - name: config-files
+        configMap: 
+          {{- if or (eq "" .Values.injectCfgFiles.configMapName ) (eq "-" .Values.injectCfgFiles.configMapName ) }}
+          name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "config-files" }} 
+          {{- else }}
+          name: {{ .Values.injectCfgFiles.configMapName }}
+          {{- end }}
+      {{- end }}
+
+{{- if .Values.masterPod.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ {{ .Values.masterPod.persistence.accessMode }} ]
+      resources:
+        requests:
+          storage: {{ .Values.masterPod.persistence.size }}
+      {{- if .Values.masterPod.persistence.storageClass }}
+      {{- if or (eq "" .Values.masterPod.persistence.storageClass) (eq "-" .Values.masterPod.persistence.storageClass) }}
+      storageClassName: ""
+      {{- else }}
+      storageClassName: {{ .Values.masterPod.persistence.storageClass | quote }}
+      {{- end }}
+      {{- end }}
+{{- end -}}

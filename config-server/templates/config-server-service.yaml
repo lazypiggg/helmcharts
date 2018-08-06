@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  {{ if and .Values.loadbalancerName .Values.loadbalancerPort }}
+  annotations:
+    loadbalancer.alauda.io/bind: '[{"container_port":{{.Values.port}},"protocol":"http","name":"{{.Values.loadbalancerName}}","port":{{.Values.loadbalancerPort}}}]'
+  {{ end }}
+  namespace: {{ .Release.Namespace }}
+  name: {{ template "config-server.fullname" . }}
+  labels:
+    app: {{ template "config-server.fullname" . }}-{{ .Release.Namespace }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  ports:
+  - name: config-server
+    port: {{ .Values.port }}
+  selector:
+    app: {{ template "config-server.fullname" . }}-{{ .Release.Namespace }}

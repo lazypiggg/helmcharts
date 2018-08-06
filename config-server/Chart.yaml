@@ -1,0 +1,12 @@
+apiVersion: v1
+description: Spring Cloud Config provides server-side and client-side support for externalized configuration in a distributed system. With the Config Server, you have a central place to manage external properties for applications across all environments.
+name: config-server
+version: 0.1.0
+appVersion: 0.1.0
+charttype: 1
+sources:
+- https://github.com/spring-cloud/spring-cloud-config
+icon: "https://s3.cn-north-1.amazonaws.com.cn/homepage/catalog/Config+Server.png"
+maintainers:
+- name: skwang
+  email: skwang@alauda.io

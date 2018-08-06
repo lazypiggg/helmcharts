@@ -1,0 +1,12 @@
+apiVersion: v1
+description: Hystrix is a latency and fault tolerance library designed to isolate points of access to remote systems, services and 3rd party libraries, stop cascading failure and enable resilience in complex distributed systems where failure is inevitable.
+name: hystrix-dashboard
+version: 0.1.0
+appVersion: 0.1.0
+charttype: 1
+sources:
+- https://github.com/Netflix/Hystrix
+icon: "https://s3.cn-north-1.amazonaws.com.cn/homepage/catalog/Hystrix+Dashboard.png"
+maintainers:
+- name: skwang
+  email: skwang@alauda.io

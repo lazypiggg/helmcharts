@@ -1,0 +1,29 @@
+{{- $hostnodes := .Values.nodeName -}}
+{{- $chartname := .Chart.Name -}}
+{{- $chartversion := .Chart.Version -}}
+{{- $relname := .Release.Name -}}
+{{- $relservice := .Release.Service -}}
+{{- $size := .Values.persistence.pvc.size -}}
+{{- $storageClassName := .Values.persistence.pvc.storageClassName -}}
+
+{{- if eq .Values.persistence.mode "pvc" }}
+{{- range $index, $realnodeName := .Values.nodeName }}
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ $relname }}-{{ $chartname }}-{{ $index }}
+  labels:
+    app: {{ $relname }}-{{ $chartname }}
+    chart: "{{ $chartname }}-{{ $chartversion }}"
+    release: "{{ $relname }}"
+    heritage: "{{ $relservice }}"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $size }}
+  storageClassName: "{{ $storageClassName }}"
+{{- end }}
+{{- end }}

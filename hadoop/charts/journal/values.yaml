@@ -1,0 +1,83 @@
+########################################################
+##
+##  ** Main chart values definition. **
+##  desc: define chart values which used by templates
+##  author: yuanfang@alauda.io
+##
+########################################################
+
+# The base hadoop image to use for all components.
+metadata: 
+  vendor: alauda
+  k8sResourceName:
+    # journal: journal
+    journal-svc: svc
+    journal-pdb: pdb
+    journal-cm: cm
+    journal-pvc: pvc
+
+registryAddress: index.alauda.cn
+
+imagePullPolicy: IfNotPresent
+
+# Select anitAffinity as either hard or soft, default is hard
+antiAffinity: "soft"
+
+#
+# hadoop-ha mode has 3 journals(journal-pod)
+#
+journalPod:
+  pdbMinAvailable: 1
+  replicas: 3
+  resources:
+    requests:
+      memory: "1024Mi"
+      cpu: "500m"
+    limits:
+      memory: "4096Mi"
+      cpu: "2000m"
+  mountPath: /data01/data
+  port:
+    p8485: 8485
+  persistence:
+    enabled: false
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 1Gi
+
+
+########################################################
+##
+##  ** related section define the other related thing,
+##     such as dependent and subChart variables which 
+##     will override the props later.
+##  desc: there can be more than one related settings
+##  author: yuanfang@alauda.io
+##
+########################################################
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## structure
+## relatedChartName - subchartname or outer dependent chart name
+## metadata - root of metadata
+## k8sResourceName - parent of k8s resources
+## resourceName1 - detail resource name
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# relatedChartName:
+  # metadata: 
+    # k8sResourceName:
+      # resourceName1:
+      # resourceName2:
+  # values1:
+    # sub values:
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+zookeeper:
+  metadata: 
+    k8sResourceName:
+      namespace: default
+      svc: zk-hs
+      name: zk
+  port:
+    clientPort: 2181
+  replicas: 3
+  

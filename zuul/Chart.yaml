@@ -1,0 +1,12 @@
+apiVersion: v1
+description: Zuul is a gateway service that provides dynamic routing, monitoring, resiliency, security, and more.
+name: zuul
+version: 0.1.0
+appVersion: 0.1.0
+charttype: 1
+sources:
+- https://github.com/Netflix/zuul
+icon: https://s3.cn-north-1.amazonaws.com.cn/homepage/catalog/Zuul.png
+maintainers:
+- name: skwang
+  email: skwang@alauda.io

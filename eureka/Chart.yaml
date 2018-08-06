@@ -1,0 +1,12 @@
+apiVersion: v1
+description: Eureka is a REST (Representational State Transfer) based service that is primarily used in the AWS cloud for locating services for the purpose of load balancing and failover of middle-tier servers.
+name: eureka
+version: 0.1.0
+appVersion: 0.1.0
+charttype: 1
+sources:
+- https://github.com/Netflix/eureka
+icon: https://s3.cn-north-1.amazonaws.com.cn/homepage/catalog/Eureka.png
+maintainers:
+- name: skwang
+  email: skwang@alauda.io

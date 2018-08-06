@@ -1,0 +1,113 @@
+## RabbitMQ application credentials
+## Ref: http://rabbitmq.com/access-control.html
+##
+rabbitmqPassword: guest
+
+registryAddress: index.alauda.cn
+
+## Number of replicas
+replicaCount: 3
+
+lb:
+  load_balance_name: alauda-lb
+  rabbitmqEpmdPort: 4369
+  rabbitmqNodePort: 5672
+  rabbitmqManagerPort: 15672
+
+## EPMD port for peer discovery service used by RabbitMQ nodes and CLI tools
+## Ref: https://www.rabbitmq.com/clustering.html
+##
+rabbitmqEpmdPort: 4369
+
+## Node port
+rabbitmqNodePort: 5672
+
+## Manager port
+rabbitmqManagerPort: 15672
+
+## Set to true to precompile parts of RabbitMQ with HiPE, a just-in-time
+## compiler for Erlang. This will increase server throughput at the cost of
+## increased startup time. You might see 20-50% better performance at the cost
+## of a few minutes delay at startup.
+rabbitmqHipeCompile: false
+
+## #the storage mode ,use pvc or host,if pvc please set storageClassName,else set HostUsedPath
+##if use host mode ,please clear the $HostUsedPath before create new app
+persistentVolume:
+  mode: pvc
+  pvc:
+    size: 8Gi
+    storageClassName: alauda-system-gfs
+  host:
+    HostUsedPath: /tmp
+
+
+## Node labels for pod assignment
+## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
+##
+nodeSelector: {"nas":"true"}
+
+
+livenessProbe:
+  initialDelaySeconds: 120
+  timeoutSeconds: 5
+  failureThreshold: 6
+
+readinessProbe:
+  initialDelaySeconds: 10
+  timeoutSeconds: 3
+  periodSeconds: 5
+
+## SSL certificates
+## Red: http://www.rabbitmq.com/ssl.html
+rabbitmqCert:
+  enabled: false
+
+  ## Create a new secret using these values
+  cacertfile: |
+  certfile: |
+  keyfile: |
+
+
+num_tcp_acceptors: 10
+handshake_timeout: 10000
+vm_memory_high_watermark_paging_ratio: 0.5
+disk_free_limit: 50000000
+frame_max: 131072
+channel_max: 0
+heartbeat: 60
+collect_statistics: "none"
+collect_statistics_interval: 5000
+cluster_keepalive_interval: 10000
+queue_index_embed_msgs_below: 4096
+mnesia_table_loading_retry_timeout: 30000
+
+
+
+
+
+## AMQPS support
+## Ref: http://www.rabbitmq.com/ssl.html
+rabbitmqAmqpsSupport:
+  enabled: false
+  # NodePort
+  amqpsNodePort: 5671
+  # SSL configuration
+  config: |
+    listeners.ssl.default             = 5671
+    ssl_options.cacertfile            = /etc/cert/cacert.pem
+    ssl_options.certfile              = /etc/cert/cert.pem
+    ssl_options.keyfile               = /etc/cert/key.pem
+    ssl_options.verify                = verify_peer
+    ssl_options.fail_if_no_peer_cert  = false
+
+image:
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 1
+    memory: 4Gi
+  requests:
+    cpu: 500m
+    memory: 2Gi

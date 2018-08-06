@@ -1,0 +1,170 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "core-cm" }} 
+data:
+  SERVICES: hadoop-ha
+  GROUP: core 
+  GROUP_ROLE: core
+  COMPONENT: dn,nm
+  DATA_PATH: {{ .Values.corePod.mountPath }}
+  DFS_REPLICAS: {{ .Values.corePod.replicas | quote }}
+  NAMENODE_ADDR1:  "{{ template "hadoop.fullname" . }}-{{ .Values.metadata.k8sResourceName.master}}-0.{{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-svc"}}.{{ .Release.Namespace}}"
+  NAMENODE_ADDR2:  "{{ template "hadoop.fullname" . }}-{{ .Values.metadata.k8sResourceName.master}}-1.{{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "master-svc"}}.{{ .Release.Namespace}}"
+  NAMENODE_PORT: {{ .Values.masterPod.port.p9000 | quote }}
+  QJOURNAL_LIST: {{ range $v := until ((int .Values.journal.journalPod.replicas) | default 3 )}}
+                {{- $.Release.Name -}}-{{- index $.Values "journal" "metadata" "k8sResourceName" "journal-chart" -}}-{{- $v -}}
+                .{{- $.Release.Name -}}-{{- index $.Values "journal" "metadata" "k8sResourceName" "journal-chart" -}}
+                -{{- index $.Values "journal" "metadata" "k8sResourceName" "journal-svc" -}}
+                .{{- index $.Values "journal" "metadata" "k8sResourceName" "journal-namespace" | default  $.Release.Namespace -}}
+                :{{- $.Values.journal.journalPod.port.p8485 -}}
+                {{- if eq (add1 $v) (int $.Values.journal.journalPod.replicas) -}}
+                {{- else -}}
+                {{- printf ";" -}}
+                {{- end -}}
+                {{- end }}
+#---  
+#apiVersion: policy/v1beta1
+#kind: PodDisruptionBudget
+#metadata:
+#  name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "core-pdb"}}
+#spec:
+#  selector:
+#    matchLabels:
+#      vender: {{ .Values.metadata.vendor }}
+#      app: {{ template "hadoop.fullname" . }}-{{ .Values.metadata.k8sResourceName.core}}
+#      chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+#      release: {{ .Release.Name }} 
+#  maxUnavailable: {{ .Values.corePod.pdbMinAvailable }}
+---  
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "core-svc"}}
+  labels:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "hadoop.name" . }}-{{ .Values.metadata.k8sResourceName.core}}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  ports:
+  {{- range $key, $val := .Values.corePod.port }}
+  - name: {{ $key }}
+    port: {{ $val }}
+  {{- end }}
+  clusterIP: None
+  selector:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "hadoop.fullname" . }}-{{ .Values.metadata.k8sResourceName.core}} 
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: {{ template "hadoop.fullname" . }}-{{ .Values.metadata.k8sResourceName.core}}
+spec:
+  serviceName: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "core-svc"}}
+  replicas: {{ .Values.corePod.replicas }}
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: OrderedReady
+  template:
+    metadata:
+      labels:
+        vender: {{ .Values.metadata.vendor }}
+        app: {{ template "hadoop.fullname" . }}-{{ .Values.metadata.k8sResourceName.core}} 
+        chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+        release: {{ .Release.Name }} 
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                    - {{ template "hadoop.fullname" . }}-{{ .Values.metadata.k8sResourceName.core}} 
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: {{ template "hadoop.fullname" . }}-{{ .Values.metadata.k8sResourceName.core}} 
+        imagePullPolicy: Always
+        image: {{ .Values.registryAddress }}{{- template "image.repository.part" . -}}:{{- template "image.tag" . }}
+        resources:
+          requests:
+            memory: {{ .Values.corePod.resources.requests.memory}} 
+            cpu: {{ .Values.corePod.resources.requests.cpu}}
+          limits:
+            memory: {{ .Values.corePod.resources.limits.memory}} 
+            cpu: {{ .Values.corePod.resources.limits.cpu}}
+        ports:
+        {{- range $key, $val := .Values.corePod.port }}
+        - containerPort: {{ $val }}
+        {{- end }}
+       
+        command:
+        - sh
+        - -c
+        {{ if .Values.injectCfgFiles.enabled -}}
+        - "cp /tmp/hadoop-config/bootstrap.sh /usr/local/bin/bootstrap.sh && chmod 755 /usr/local/bin/bootstrap.sh && /usr/local/bin/bootstrap.sh && /opt/alauda/sbin/startup.sh"
+        {{- else -}}
+        - "/opt/alauda/sbin/startup.sh"
+        {{- end }}
+        envFrom:
+        - configMapRef:
+            name: {{ template "hadoop.fullname" . }}-{{index .Values "metadata" "k8sResourceName" "core-cm"}}
+        volumeMounts:
+        - name: datadir
+          mountPath: {{ .Values.corePod.mountPath }}
+        {{- if .Values.injectCfgFiles.enabled }}
+        - mountPath: /tmp/hadoop-config/bootstrap.sh
+          name: config-files
+          subPath: bootstrap.sh
+        - mountPath: {{ .Values.injectCfgFiles.cfgMountPath }}/etc/hadoop/core-site.xml 
+          name: config-files
+          subPath: core-site.xml
+        - mountPath: {{ .Values.injectCfgFiles.cfgMountPath }}/etc/hadoop/hdfs-site.xml
+          name: config-files
+          subPath: hdfs-site.xml
+        - mountPath: {{ .Values.injectCfgFiles.cfgMountPath }}/etc/hadoop/mapred-site.xml
+          name: config-files
+          subPath: mapred-site.xml
+        - mountPath: {{ .Values.injectCfgFiles.cfgMountPath }}/etc/hadoop/yarn-site.xml
+          name: config-files
+          subPath: yarn-site.xml  
+        {{- end }}
+      
+      volumes:
+      {{- if .Values.injectCfgFiles.enabled }}
+      - name: config-files
+        configMap: 
+          {{- if or (eq "" .Values.injectCfgFiles.configMapName ) (eq "-" .Values.injectCfgFiles.configMapName ) }}
+          name: {{ template "hadoop.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "config-files" }} 
+          {{- else }}
+          name: {{ .Values.injectCfgFiles.configMapName }}
+          {{- end }}
+      {{- end }}
+      {{- if not .Values.corePod.persistence.enabled }}
+      - name: datadir
+        emptyDir: {}
+      {{- end }}
+
+{{- if .Values.corePod.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ {{ .Values.corePod.persistence.accessMode }} ]
+      resources:
+        requests:
+          storage: {{ .Values.corePod.persistence.size }}
+      {{- if .Values.corePod.persistence.storageClass }}
+      {{- if or (eq "" .Values.corePod.persistence.storageClass) (eq "-" .Values.corePod.persistence.storageClass) }}
+      storageClassName: ""
+      {{- else }}
+      storageClassName: {{ .Values.corePod.persistence.storageClass | quote }}
+      {{- end }}
+      {{- end }}
+{{- end -}}    

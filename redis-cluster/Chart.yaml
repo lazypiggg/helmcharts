@@ -1,0 +1,19 @@
+name: redis-cluster
+version: 1.0.0
+appVersion: 4.0.10
+description: Open source, advanced key-value store. It is often referred to as a data structure server since keys can contain strings, hashes, lists, sets and sorted sets.
+keywords:
+- redis
+- keyvalue
+- database
+home: http://redis.io/
+icon: https://bitnami.com/assets/stacks/redis/img/redis-stack-220x234.png
+charttype: 2
+sources:
+- https://hub.docker.com/_/redis/
+maintainers:
+- name: lihuang
+  email: lihuang@alauda.io
+- name: jliao
+  email: jliao@alauda.io
+engine: gotpl

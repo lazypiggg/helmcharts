@@ -1,0 +1,40 @@
+## image registry address
+registryAddress: index.alauda.cn
+
+## Specify an imagePullPolicy (Required)
+## It's recommended to change this to 'Always' if the image tag is 'latest'
+## ref: http://kubernetes.io/docs/user-guide/images/#updating-images
+##
+imagePullPolicy: IfNotPresent
+
+resources:
+  requests:
+    memory: 1G
+    cpu: 100m
+  limits:
+    memory: 1G
+    cpu: 100m
+
+# Replica num
+replicas: 1
+
+# Container port
+port: 80
+
+# Kafka endpoint
+kafkaEndpoint: kafka-headless.sample-namespace:9092
+
+# Zookeeper endpoint
+zookeeperEndpoint: zookeeper-headless.sample-namespace:2181
+
+# Spring config Server endpoint
+configserverEndpoint: ""
+
+# Command-line options, The launcher has a set of standard options that are supported in the current runtime environment.
+javaOptions: ""
+
+# Alauda loadbalance name
+loadbalancerName: ""
+
+# Alauda loadbalance port
+loadbalancerPort: ""

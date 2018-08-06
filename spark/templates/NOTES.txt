@@ -1,0 +1,25 @@
+1. Get the Spark URL to visit by running these commands in the same shell:
+  
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+  You can watch the status of by running 'kubectl get svc --namespace {{ .Release.Namespace }} -w {{ template "webui-fullname" . }}'
+  
+  export SPARK_SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ template "webui-fullname" . }} -o jsonpath='{.spec.clusterIP}')
+  echo http://$SPARK_SERVICE_IP:{{ .Values.WebUi.ServicePort }}
+  
+  ## or if you use a ssh tunnel,access Spark URL as below
+  export SPARK_NODEPORT_ON_MASTER=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ template "webui-fullname" . }} -o jsonpath='{.spec.ports[0].nodePort}')
+  echo http://localhost:$SPARK_NODEPORT_ON_MASTER
+
+
+2. Get the Zeppelin URL to visit by running these commands in the same shell:
+  
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+  You can watch the status of by running 'kubectl get svc --namespace {{ .Release.Namespace }} -w {{ template "zeppelin-fullname" . }}'
+  
+  export ZEPPELIN_SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ template "zeppelin-fullname" . }} -o jsonpath='{.spec.clusterIP}')
+  echo http://$ZEPPELIN_SERVICE_IP:{{ .Values.Zeppelin.ServicePort }}
+
+  ## or if you use a ssh tunnel,access Zeppelin URL as below
+  export ZEPPELIN_NODEPORT_ON_MASTER=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ template "zeppelin-fullname" . }} -o jsonpath='{.spec.ports[0].nodePort}')
+  echo http://localhost:$ZEPPELIN_NODEPORT_ON_MASTER
+

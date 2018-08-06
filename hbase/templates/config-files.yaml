@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "hbase.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "config-files" }} 
+data:
+  bootstrap.sh: |
+    #!/bin/bash
+    : ${HBASE_PREFIX:={{ .Values.injectCfgFiles.cfgMountPath }}}
+
+    #remove default localhost regionserver
+    echo "" > $HBASE_PREFIX/conf/regionservers
+
+    {{ if (int $.Values.zookeeper.ready) -}}
+      echo "export HBASE_MANAGES_ZK=false" >> $HBASE_PREFIX/conf/hbase-env.sh
+    {{- end }}
+    . $HBASE_PREFIX/bin/hbase-config.sh
+
+    # Directory to find config artifacts
+    CONFIG_DIR="/tmp/hbase-config"
+
+    # Copy config files from volume mount
+
+    # for f in hbase-site.xml ; do
+    #   if [[ -e ${CONFIG_DIR}/$f ]]; then
+    #     cp ${CONFIG_DIR}/$f $HBASE_PREFIX/conf/$f
+    #   else
+    #     echo "ERROR: Could not find $f in $CONFIG_DIR"
+    #     exit 1
+    #   fi
+    # done
+    # set regionserver svc in  hbase-site.xml
+    if [[ "${GROUP}" == "core" && "${GROUP_ROLE}" == "core" ]]; then
+      sed -i '/<\/configuration>/d' $HBASE_PREFIX/conf/hbase-site.xml
+      cat >> $HBASE_PREFIX/conf/hbase-site.xml <<- EOM
+      <property>
+        <name>hbase.regionserver.hostname</name>
+        <value>`hostname`.`hostname -d`</value>
+      </property>
+    </configuration>
+    EOM
+    fi
+
+  hbase-site.xml: |
+    <configuration>
+    <property>
+      <name>hbase.rootdir</name>
+      <value>hdfs://{{- .Values.hadoop.masterPod.nameservice -}}{{- index .Values "hbase" "root-dir" | default "/hbase1" -}}</value>
+    </property>
+    <property>
+      <name>hbase.cluster.distributed</name>
+      <value>true</value>
+    </property>
+    <property>
+      <name>hbase.zookeeper.property.dataDir</name>
+      <value>{{- .Values.masterPod.mountPath -}}/zookeeper/data</value>
+    </property>
+    <property>
+      <name>hbase.tmp.dir</name>
+      <value>{{- .Values.masterPod.mountPath -}}/hbase</value>
+    </property>
+    <property>
+      <name>hbase.zookeeper.quorum</name>
+      <value>
+        {{- range $v := until ((int .Values.zookeeper.replicas) | default 3 )}}
+        {{- $.Values.zookeeper.metadata.k8sResourceName.name -}}-{{- $v -}}
+        .{{- $.Values.zookeeper.metadata.k8sResourceName.svc -}}
+        .{{- $.Values.zookeeper.metadata.k8sResourceName.namespace -}}
+        {{- if eq (add1 $v) (int $.Values.zookeeper.replicas) -}}
+        {{- else -}}
+        {{- printf "," -}}
+        {{- end -}}
+        {{ end -}}
+      </value>
+    </property>
+    <property>
+      <name>hbase.zookeeper.property.clientPort</name>
+      <value>{{- .Values.zookeeper.port.clientPort -}}</value>
+    </property>
+    </configuration>
+

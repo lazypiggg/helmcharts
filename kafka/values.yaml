@@ -1,0 +1,27 @@
+#------------------------------------------------------------------------------
+# Kafka:
+#------------------------------------------------------------------------------
+
+Replicas: 3
+registryAddress: index.alauda.cn
+ImagePullPolicy: "IfNotPresent"
+resources:
+  limits:
+    cpu: 1
+    memory: 4Gi
+  requests:
+    cpu: 500m
+    memory: 2Gi
+Storage: "1Gi"
+DataDirectory: "/opt/kafka/data"
+
+#------------------------------------------------------------------------------
+# Zookeeper:
+#------------------------------------------------------------------------------
+
+#serverhost: the exist zookeeper client serverice name in k8s, if kakfa and zk not in the same namespace,then add namespace
+#serverport: the exist zookeeper client service port
+
+zookeeper:
+  serverhost: myzk-zookeeper
+  serverport: 2181

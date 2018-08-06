@@ -1,0 +1,215 @@
+########################################################
+##
+##  ** Main chart values definition. **
+##  desc: define chart values which used by templates
+##  author: yuanfang@alauda.io
+##
+########################################################
+
+
+#
+# alauda internal metadata ,describe the structure for alauda bigdata's charts.
+#
+metadata:
+  vendor: alauda
+  k8sResourceName:
+    ########################################
+    # current chart resources
+    ########################################
+    # for app
+    config-files: config-files
+    config-params: config-params
+
+    # for specific component
+    master: master
+    master-svc: master-svc
+    master-pdb: master-pdb
+    master-cm: master-cm
+    master-cm-env: master-cm-env
+    master-pvc: master-pvc
+    master-cs: master-client-svc
+
+    core: core
+    core-svc: core-svc
+    core-pdb: core-pdb
+    core-cm: core-cm
+    core-cm-env: core-cm-env
+    core-pvc: core-pvc
+
+    timeline: timeline
+    timeline-cm: timeline-cm
+    timeline-pvc: timeline-pvc
+    timeline-svc: timeline-svc
+
+registryAddress: index.alauda.cn
+imagePullPolicy: IfNotPresent
+
+# Select anitAffinity as either hard or soft, default is hard
+antiAffinity: "soft"
+
+#
+# hadoop-ha mode has 3 masters(master-pod) & N slaves (core-pod)
+#
+masterPod:
+  pdbMinAvailable: 1
+  resources:
+    requests:
+      memory: "2048Mi"
+      cpu: "500m"
+    limits:
+      memory: "4096Mi"
+      cpu: "2000m"
+  port:
+    p50070: 50070
+    p8088: 8088
+    p9000: 9000
+    p8033: 8033
+    p22379: 22379
+    p22380: 22380
+  clientPort:
+      p50070: 50070
+      p8088: 8088
+  mountPath: /data01/data
+  persistence:
+    enabled: false
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 2Gi
+
+corePod:
+  replicas: 1
+  parallelCreate: true
+  pdbMinAvailable: 1
+  resources:
+    requests:
+      memory: "2048Mi"
+      cpu: "500m"
+    limits:
+      memory: "4096Mi"
+      cpu: "2000m"
+  port:
+    p50010: 50010
+    p50020: 50020
+    p50075: 5007
+    p8040: 8040
+    p8042: 8042
+  mountPath: /data01/data
+  persistence:
+    enabled: false
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 5Gi
+
+timelinePod:
+  replicas: 1
+  resources:
+    requests:
+      memory: "2048Mi"
+      cpu: "500m"
+    limits:
+      memory: "4096Mi"
+      cpu: "2000m"
+  port:
+    p10020: 10020
+    p8188: 8188
+  mountPath: /data01/data
+  persistence:
+    enabled: false
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 2Gi
+
+injectCfgFiles:
+  enabled: true
+  cfgMountPath: /opt/alauda/hadoop
+  #user defined configmap object contains config files that use filename as key,
+  #content as value. eg. yarn-site.xml core-site.xml mapred-site.xml hdfs-site.xml
+  configMapName: ""
+
+
+########################################################
+##
+##  ** related section define the other related thing,
+##     such as dependent and subChart variables which
+##     will override the props later.
+##  desc: there can be more than one related settings
+##  author: yuanfang@alauda.io
+##
+########################################################
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## structure
+## relatedChartName -
+## metadata -
+## k8sResourceName -
+## resourceName1 -
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# relatedChartName:
+  # metadata:
+    # k8sResourceName:
+      # resourceName1:
+      # resourceName2:
+  # values1:
+    # sub values:
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# dependency for hadoop-ha
+# these values used by hadoop-ha
+zookeeper:
+  metadata:
+    k8sResourceName:
+      namespace: default
+      svc: zk-hs
+      name: zk
+  port:
+    clientPort: 2181
+  replicas: 3
+
+journal:
+  registryAddress: index.alauda.cn
+  metadata:
+    k8sResourceName:
+      ########################################
+      # override subchart resource name (optional)
+      ########################################
+
+      ##journal-chart is subchart name of journal
+      journal-chart: journal
+
+      ## journal-namespace is to set the journal-node's namespace
+      ## if leave empty, it will uses chart's namespace.
+      # journal-namespace: outer_journal_node_namespace
+
+      journal-svc: jn-svc
+      journal-pdb: jn-pdb
+      journal-cm: jn-cm
+      journal-pvc: jn-pvc
+
+  journalPod:
+    port:
+      p8485: 8485
+    replicas: 3
+    persistence:
+      enabled: false
+      storageClass: ""
+      accessMode: ReadWriteOnce
+      size: 1Gi
+    resources:
+      requests:
+        memory: "1024Mi"
+        cpu: "500m"
+      limits:
+        memory: "4096Mi"
+        cpu: "2000m"  
+
+  ## dependency for journal
+  ## which is same as above (dependency for hadoop-ha)
+  ## these values used by journal node
+  zookeeper:
+    metadata:
+      k8sResourceName:
+        namespace: default
+        svc: zk-hs
+        name: zk
+    port:
+      clientPort: 2181
+    replicas: 3

@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "zeppelin-fullname" . }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    component: "{{ .Release.Name }}-{{ .Values.Zeppelin.Component }}"
+spec:
+  ports:
+    - port: {{ .Values.Zeppelin.ServicePort }}
+      targetPort: {{ .Values.Zeppelin.ContainerPort }}
+  selector:
+    component: "{{ .Release.Name }}-{{ .Values.Zeppelin.Component }}"
+  type: "LoadBalancer"
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ template "zeppelin-fullname" . }}
+  labels:
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    component: "{{ .Release.Name }}-{{ .Values.Zeppelin.Component }}"
+spec:
+  replicas: {{ default 1 .Values.Zeppelin.Replicas }}
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      component: "{{ .Release.Name }}-{{ .Values.Zeppelin.Component }}"
+  template:
+    metadata:
+      labels:
+        heritage: {{ .Release.Service | quote }}
+        release: {{ .Release.Name | quote }}
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        component: "{{ .Release.Name }}-{{ .Values.Zeppelin.Component }}"
+    spec:
+      containers:
+        - name: {{ template "zeppelin-fullname" . }}
+          image: {{ .Values.registryAddress }}{{- template "zeppelin.image.repository.part" . -}}:{{- template "zeppelin.image.tag" . }}
+          command: ["/bin/sh","-c"]
+          args: 
+          - echo export MASTER=spark://{{ template "master-fullname" . }}:{{ .Values.Master.ServicePort }} >> /etc/zeppelin/zeppelin-env.sh && /opt/alauda/zeppelin/bin/zeppelin.sh
+          ports:
+            - containerPort: {{ .Values.Zeppelin.ContainerPort }}
+          resources:
+            requests:
+              cpu: "{{ .Values.Zeppelin.Cpu }}"
+          env:
+          - name: MASTER
+            value: spark://{{ template "master-fullname" . }}:{{ .Values.Master.ServicePort }}
+          - name: SPARK_HOME
+            value: /opt/alauda/spark
+          {{- if .Values.hadoop.ready }}
+          - name: HADOOP_CONF_DIR
+            value: "/etc/hadoop"
+          - name: YARN_CONF_DIR
+            value: "/etc/hadoop"
+          volumeMounts:
+          - name: hadoop-config
+            mountPath: /etc/hadoop
+      volumes:
+      - name: hadoop-config
+        configMap: 
+          name: {{ index .Values "hadoop" "configMapName"}}
+      {{- end }}

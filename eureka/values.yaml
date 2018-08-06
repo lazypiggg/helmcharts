@@ -1,0 +1,31 @@
+## image registry address
+registryAddress: index.alauda.cn
+
+## Specify an imagePullPolicy (Required)
+## It's recommended to change this to 'Always' if the image tag is 'latest'
+## ref: http://kubernetes.io/docs/user-guide/images/#updating-images
+##
+imagePullPolicy: IfNotPresent
+
+resources:
+  requests:
+    memory: 1G
+    cpu: 100m
+  limits:
+    memory: 1G
+    cpu: 100m
+
+# Replica num
+replicas: 2
+
+# Container port
+port: 8761
+
+# Command-line options, The launcher has a set of standard options that are supported in the current runtime environment.
+javaOptions: ""
+
+# Alauda loadbalance name
+loadbalancerName: ""
+
+# Alauda loadbalance port
+loadbalancerPort: ""

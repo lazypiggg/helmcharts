@@ -1,0 +1,146 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "journal.fullname" . }}-{{index .Values "metadata" "k8sResourceName" "journal-cm" }} 
+data:
+  SERVICES: journal-node
+  GROUP: master
+  GROUP_ROLE: core
+  COMPONENT: jn
+  DATA_PATH: {{ .Values.journalPod.mountPath }}
+  HA_ZK_QUORUM: {{ range $v := until ((int .Values.zookeeper.replicas) | default 3 )}}
+                {{- $.Values.zookeeper.metadata.k8sResourceName.name -}}-{{- $v -}}
+                .{{- $.Values.zookeeper.metadata.k8sResourceName.svc -}}
+                .{{- $.Values.zookeeper.metadata.k8sResourceName.namespace -}}
+                :{{- $.Values.zookeeper.port.clientPort -}}
+                {{- if eq (add1 $v) (int $.Values.zookeeper.replicas) -}}
+                {{- else -}}
+                {{- printf "," -}}
+                {{- end -}}
+                {{ end }}
+
+---  
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ template "journal.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "journal-pdb" }}
+spec:
+  selector:
+    matchLabels:
+      vender: {{ .Values.metadata.vendor }}
+      app: {{ template "journal.fullname" . }}
+      chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+      release: {{ .Release.Name }} 
+  maxUnavailable: {{ .Values.journalPod.pdbMinAvailable }}
+---  
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "journal.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "journal-svc" }}
+  labels:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "journal.fullname" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  ports:
+  {{- range $key, $val := .Values.journalPod.port }}
+  - name: {{ $key }}
+    port: {{ $val }}
+  {{- end }}
+  clusterIP: None
+  selector:
+    vender: {{ .Values.metadata.vendor }}
+    app: {{ template "journal.fullname" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+---    
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: {{ template "journal.fullname" . }}
+spec:
+  selector:
+  serviceName: {{ template "journal.fullname" . }}-{{ index .Values "metadata" "k8sResourceName" "journal-svc"}}
+  replicas: {{ default 3 .Values.journalPod.replicas }}
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        vender: {{ .Values.metadata.vendor }}
+        app: {{ template "journal.fullname" . }}
+        chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+        release: {{ .Release.Name }} 
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                    - {{ template "journal.fullname" . }}
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: {{ template "journal.fullname" . }}
+        imagePullPolicy: Always
+        image: {{ .Values.registryAddress }}{{- template "image.repository.part" . -}}:{{- template "image.tag" . }}
+        resources:
+          requests:
+            memory: {{ .Values.journalPod.resources.requests.memory }} 
+            cpu: {{ .Values.journalPod.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.journalPod.resources.limits.memory }} 
+            cpu: {{ .Values.journalPod.resources.limits.cpu }}
+        ports:
+        {{- range $key, $val := .Values.journalPod.port }}
+        - containerPort: {{ $val }}
+        {{- end }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.journalPod.port.p8485 }}
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.journalPod.port.p8485 }}
+          initialDelaySeconds: 15
+          periodSeconds: 20
+
+        command:
+        - sh
+        - -c
+        - "/opt/alauda/sbin/startup.sh"
+        envFrom:
+        - configMapRef:
+            name: {{ template "journal.fullname" . }}-{{index .Values "metadata" "k8sResourceName" "journal-cm" }} 
+        volumeMounts:
+        - name: datadir
+          mountPath: {{ .Values.journalPod.mountPath }}
+      {{- if not .Values.journalPod.persistence.enabled }}
+      volumes:
+      - name: datadir
+        emptyDir: {}
+      {{- end -}}
+
+{{- if .Values.journalPod.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: [ {{ .Values.journalPod.persistence.accessMode | quote }} ]
+      resources:
+        requests:
+          storage:  {{ .Values.journalPod.persistence.size }}
+      {{- if .Values.journalPod.persistence.storageClass }}
+      {{- if or (eq "" .Values.journalPod.persistence.storageClass) (eq "-" .Values.journalPod.persistence.storageClass) }}
+      storageClassName: ""
+      {{- else }}
+      storageClassName: {{ .Values.journalPod.persistence.storageClass | quote }}
+      {{- end }}
+      {{- end }}
+{{- end -}}
